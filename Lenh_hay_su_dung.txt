@@ -1,0 +1,66 @@
+Sqlie3:
+Kiểm tra số lượng đơn hàng nghi ngờ pending trong lt_pending_candidate ở 1 khoảng thời gian nào đó:
+SELECT COUNT(*) AS total_candidates
+FROM lt_pending_candidate
+WHERE datetime(arrived_time) >= datetime('2026-08-23 04:00:00')
+  AND datetime(arrived_time) <  datetime('2026-08-23 06:00:00');
+
+Chạy BOT 1
+cd "C:\Users\spxvn25689\Desktop\BOT DELI SQLITE"
+
+ powershell.exe -NoProfile -ExecutionPolicy Bypass -File ".\RUN_BOT1_BDA_OPTIMIZED.ps1"   
+
+Chạy BOT 2,3
+powershell.exe -NoProfile -ExecutionPolicy Bypass `-File ".\RUN_BOT2_ADMIN_OPTIMIZED.ps1"
+
+
+Chạy ngày sự kiện nếu batchsearch không kịp
+
+# 1. TẮT BOT 3 trước — Ctrl+C ở cửa sổ đang chạy RUN_BOT3_FINAL_WORK.ps1
+#    BOT 1 và BOT 2 cứ để chạy, không sao.
+
+$env:BOT_DELI_TO_TASK_MODE = "1"
+$env:PYTHONUTF8 = "1"
+$env:PYTHONUNBUFFERED = "1"
+
+# 2. Đếm trước, không gọi FMS, không ghi gì
+python .\SWEEP_BATCHSEARCH.py --dry-run
+
+# 3. Chạy THỬ MỘT LÔ để đo tốc độ thật
+python .\SWEEP_BATCHSEARCH.py --lot 25000 --so-lot 1
+
+# 4. Thấy ổn thì chạy hết
+python .\SWEEP_BATCHSEARCH.py --lot 25000
+
+python .\SWEEP_BATCHSEARCH.py --lot 25000 --moc precheck    # xe về +24h
+python .\SWEEP_BATCHSEARCH.py --lot 25000 --moc final       # xe về +32h
+python .\SWEEP_BATCHSEARCH.py --lot 25000                   # +36h, mặc định như cũ
+
+
+Xóa bớt sheet
+$env:BOT_DELI_TO_TASK_MODE = "1"
+python .\PURGE_WORK_NOW.py --ngay 3 --xem-truoc    # chỉ in, không xoá
+python .\PURGE_WORK_NOW.py --ngay 3                # xoá thật
+python .\PURGE_WORK_NOW.py --ngay 5 --cho 900      # chờ BOT 3 nhả khoá tối đa 15 phút
+
+
+Clear 
+# TẮT BOT 3 trước
+$env:BOT_DELI_TO_TASK_MODE = "1"
+$env:PYTHONUTF8 = "1"
+
+python .\RECHECK_PENDING_BATCHSEARCH.py --nhom ca-hai --xem-truoc
+python .\RECHECK_PENDING_BATCHSEARCH.py --nhom ca-hai
+
+# BẬT lại BOT 3
+
+
+Lấy cogs
+$env:PYTHONUTF8 = "1"
+python .\LAY_COGS.py
+
+chiA pic
+$env:PYTHONUTF8 = "1"
+$env:BOT_DELI_TO_TASK_MODE = "1"
+python .\CHIA_PIC_NGAY.py --cho 900
+
