@@ -10,7 +10,7 @@ lt_in_unit.parsed_status o day LUON la NOT_PARSED khi moi ghi: no nghia la
 "da ra MANIFEST (goi general_to/detail/search) cho TO nay hay chua", va se
 duoc Buoc 3 chuyen thanh PARSED sau khi ra xong tung TO. Buoc nay chi chiu
 trach nhiem cho lt_in_trip.parsed_status (da lay danh sach TO cua LT nay hay
-chua) - dung quy uoc "ghi dong moi thay vi UPDATE" giong Buoc 1.
+chua) - UPDATE truc tiep dong da co trong lt_in_trip, khong insert dong moi.
 """
 
 import argparse
@@ -110,19 +110,14 @@ def get_unparsed_trips(service, limit=None):
     return query_rows(service, query)
 
 
-def mark_trip_parsed(trip, parsed_at):
-    return {
-        "trip_number": trip.get("trip_number") or "",
-        "trip_id": ARRIVED_BOT.to_text(trip.get("trip_id")),
-        "sequence_number": ARRIVED_BOT.to_int(trip.get("sequence_number"), default=0),
-        "station": trip.get("station") or "",
-        "to_station": trip.get("to_station") or ARRIVED_BOT.SOC_CODE,
-        "arrived_time": trip.get("arrived_time"),
-        "is_last_station": trip.get("is_last_station"),
-        "parsed_status": "PARSED",
-        "parsed_at": parsed_at,
-        "observed_at": parsed_at,
-    }
+def mark_trip_parsed(service, trip, parsed_at):
+    ARRIVED_BOT.update_trip_parsed_status(
+        service,
+        trip.get("trip_id"),
+        trip.get("sequence_number"),
+        "PARSED",
+        parsed_at,
+    )
 
 
 # ------------------------------------------------------------ lt_in_unit IO
@@ -225,7 +220,7 @@ def run_once(limit=None):
     print(f"Chuyen LT can ra danh sach TO (NOT_PARSED): {len(trips)}")
 
     total_unit_rows = 0
-    parsed_trip_snapshots = []
+    parsed_trip_count = 0
     exported_at = ARRIVED_BOT.now_text()
 
     for trip in trips:
@@ -240,7 +235,8 @@ def run_once(limit=None):
             unit_rows = build_unit_rows(trip, inbound_rows, known_to_numbers, exported_at)
             inserted = insert_rows(service, unit_rows, UNIT_TABLE_ID, unit_table_schema_fields())
             total_unit_rows += inserted
-            parsed_trip_snapshots.append(mark_trip_parsed(trip, exported_at))
+            mark_trip_parsed(service, trip, exported_at)
+            parsed_trip_count += 1
             print(
                 f"Ra LT {trip_number} seq {sequence_number}: {len(inbound_rows)} dong tra ve, "
                 f"{inserted} TO moi ghi vao {UNIT_TABLE_ID}"
@@ -249,9 +245,8 @@ def run_once(limit=None):
             print(f"Loi khi ra LT {trip_number} seq {sequence_number}, se retry vong sau:")
             traceback.print_exc()
 
-    insert_rows(service, parsed_trip_snapshots, TRIP_TABLE_ID, ARRIVED_BOT.trip_table_schema_fields())
     print(
-        f"Da danh dau PARSED: {len(parsed_trip_snapshots)}/{len(trips)} chuyen. "
+        f"Da danh dau PARSED: {parsed_trip_count}/{len(trips)} chuyen. "
         f"Tong dong {UNIT_TABLE_ID} moi: {total_unit_rows}"
     )
     return total_unit_rows

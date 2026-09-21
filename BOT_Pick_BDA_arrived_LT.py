@@ -14,11 +14,10 @@ Buoc 2 (BOT_Pick_BDA_export_LT_unit.py) se doc cac dong NOT_PARSED cua bang
 nay, goi API "TO trong 1 chuyen LT" (type=inbound) voi unloaded_sequence
 lay tu day, roi danh dau lai PARSED.
 
-Trang thai duoc luu theo kieu "ghi de bang dong moi": moi lan cap nhat
-parsed_status cho 1 (trip_id, sequence_number), bot ghi them 1 dong voi
-observed_at moi thay vi UPDATE tai cho - giong quy uoc cac bang lt_* cua
-BOT chieu gui (lt_ended_trip, lt_handover_trip). Cac truy van luon lay
-"dong moi nhat theo observed_at" cho tung (trip_id, sequence_number).
+Moi (trip_id, sequence_number) chi co DUNG 1 dong trong bang: Buoc 1 INSERT
+dong moi voi parsed_status=NOT_PARSED khi lan dau phat hien; cac buoc sau
+(2, 3...) UPDATE truc tiep dong do khi xu ly xong, khong insert dong moi.
+Nho vay bang xem truc tiep bang DB Browser luon gon, khong bi nhan doi.
 """
 
 import argparse
@@ -93,6 +92,21 @@ def insert_rows(service, rows, table_id=TRIP_TABLE_ID, schema_fields=None):
         return 0
     service.store.insert_rows(table_id, rows, schema_fields or trip_table_schema_fields())
     return len(rows)
+
+
+def _sql_quote(value):
+    return str(value).replace("'", "''")
+
+
+def update_trip_parsed_status(service, trip_id, sequence_number, parsed_status, parsed_at):
+    """UPDATE tai cho, khong insert dong moi - giu lt_in_trip 1 dong/chuyen."""
+    service.store.query(
+        f"""
+        UPDATE `{BIGQUERY_PROJECT_ID}.{BIGQUERY_DATASET_ID}.{TRIP_TABLE_ID}`
+        SET parsed_status = '{_sql_quote(parsed_status)}', parsed_at = '{_sql_quote(parsed_at)}'
+        WHERE trip_id = '{_sql_quote(trip_id)}' AND sequence_number = {int(sequence_number)}
+        """
+    )
 
 
 # -------------------------------------------------------------------- util
